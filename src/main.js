@@ -42,6 +42,7 @@ const state = {
   textColor: "#111111",
   locked: false,
   captionIndex: -1,
+  geminiModel: null,
   ratio: "3:4",
   photoZoom: 1,
   panU: 0, // -1..1, fraction of available pan slack
@@ -593,7 +594,8 @@ async function generateCaption() {
       if (caption) {
         state.caption = caption;
         els.captionInput.value = caption;
-        els.analysisTag.classList.remove("show");
+        els.analysisTag.innerHTML = `✨ 由 Gemini 生成（模型：<b>${state.geminiModel}</b>）`;
+        els.analysisTag.classList.add("show");
         renderPoeticText();
         return;
       }
@@ -627,10 +629,54 @@ function applyAnalyzedCaption() {
   renderPoeticText();
 }
 
+const GEMINI_BASE = "https://generativelanguage.googleapis.com/v1beta";
+
+// 快取解析結果，避免每次生成都多打一次 ListModels
+let resolvedModel = null;
+
+async function apiError(res, what) {
+  // 失敗時帶出 API 自己的錯誤說明，只回報狀態碼查不出原因
+  let detail = "";
+  try {
+    const j = await res.json();
+    detail = j?.error?.message || "";
+  } catch {
+    /* 回應不是 JSON 就算了 */
+  }
+  return new Error(`${what} 失敗（HTTP ${res.status}）${detail ? "：" + detail : ""}`);
+}
+
+// 不寫死模型名稱：Gemini 的命名改過幾輪，寫死就會在某天變成 404。
+// 直接問這把金鑰能用哪些模型，挑一個支援 generateContent 的。
+async function resolveGeminiModel(apiKey) {
+  if (resolvedModel) return resolvedModel;
+
+  const res = await fetch(`${GEMINI_BASE}/models?key=${apiKey}`);
+  if (!res.ok) throw await apiError(res, "取得模型清單");
+
+  const { models = [] } = await res.json();
+  const usable = models.filter((m) =>
+    (m.supportedGenerationMethods || []).includes("generateContent")
+  );
+  if (!usable.length) {
+    throw new Error("這把金鑰沒有任何支援 generateContent 的模型可用");
+  }
+
+  // 偏好輕量的 flash 系列（快又便宜），其次才是其他可用模型
+  const preferred =
+    usable.find((m) => /flash/i.test(m.name) && !/vision|embedding/i.test(m.name)) ||
+    usable.find((m) => !/embedding/i.test(m.name)) ||
+    usable[0];
+
+  resolvedModel = preferred.name.replace(/^models\//, "");
+  return resolvedModel;
+}
+
 async function callGemini(apiKey, dataUrl) {
   const [meta, base64] = dataUrl.split(",");
   const mimeType = meta.match(/data:(.*);base64/)?.[1] || "image/png";
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+  const model = await resolveGeminiModel(apiKey);
+
   const body = {
     contents: [
       {
@@ -641,15 +687,25 @@ async function callGemini(apiKey, dataUrl) {
       },
     ],
   };
-  const res = await fetch(url, {
+  const res = await fetch(`${GEMINI_BASE}/models/${model}:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`API ${res.status}`);
+  if (!res.ok) {
+    // 模型可能中途被下架，清掉快取讓下次重新挑一個
+    resolvedModel = null;
+    throw await apiError(res, `呼叫模型 ${model}`);
+  }
+
   const json = await res.json();
   const text = json.candidates?.[0]?.content?.parts?.[0]?.text;
-  return text?.trim().replace(/^"|"$/g, "");
+  if (!text) {
+    const blocked = json.promptFeedback?.blockReason;
+    throw new Error(blocked ? `內容被擋下（${blocked}）` : `模型 ${model} 沒有回傳文字`);
+  }
+  state.geminiModel = model;
+  return text.trim().replace(/^"|"$/g, "");
 }
 
 function dataUrlToBlob(dataUrl) {
