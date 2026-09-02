@@ -112,4 +112,12 @@ node scripts/build-artifact.mjs   # → artifact/poetic-cutout-layout.html
   （`min(520px, 100%)`）並補上窄螢幕的直式排版。
 - **文案挑選原本只取最高分**，色調單純的照片每次都會挑到同一句，看起來像按鈕沒反應。
   改成把次佳分數也納入候選池，同色調照片會在幾句之間輪替。
+- **同一個分頁連續匯出很多次後可能會失敗**（`html-to-image` 內部的資源快取累積所致），
+  錯誤訊息是沒頭沒尾的 `[object Event]`。重整頁面就會恢復。
+
+---
+
+## 授權
+
+[MIT](LICENSE)
 
