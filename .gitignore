@@ -1,0 +1,4 @@
+node_modules/
+
+# Artifact 打包產物，用 node scripts/build-artifact.mjs 重新產生
+artifact/

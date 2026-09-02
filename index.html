@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>詩意圖文排版生成器</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Serif+TC:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="./src/style.css" />
+</head>
+<body>
+  <div class="app-container">
+    <!-- 左側設定控制台 -->
+    <aside class="sidebar">
+      <header class="sidebar-header">
+        <h1>詩意圖文排版生成器 <span class="badge">Gemini Powered</span></h1>
+        <p class="subtitle">將照片摳圖融合進詩意文字中（支援 Ctrl+V / Cmd+V 貼上圖片）</p>
+      </header>
+
+      <!-- 1. 上傳圖片 -->
+      <section class="section">
+        <h2>1. 上傳或貼上圖片 <span class="tag">支援 CTRL+V / CMD+V</span></h2>
+        <div id="dropzone" class="dropzone">
+          <input type="file" id="file-input" accept="image/*" hidden />
+          <div class="dropzone-icon">☁️</div>
+          <p>點擊上傳、拖拽圖片到此處，或直接剪貼簿貼上</p>
+        </div>
+
+        <div class="control-row" style="margin-top: 14px;">
+          <label>背景圖片縮放: <span id="val-photo-zoom" class="val-tag">100%</span></label>
+          <input type="range" id="input-photo-zoom" min="10" max="300" step="1" value="100" />
+          <span class="sub-hint">🖐 可直接在右側下方照片上拖曳調整取景位置</span>
+        </div>
+      </section>
+
+      <!-- 2. 詩意描述 -->
+      <section class="section">
+        <div class="section-title-row">
+          <h2>2. 詩意描述 (POETIC CAPTION)</h2>
+          <button id="btn-ai-gen" class="btn-ai">✨ Gemini AI 重新生成</button>
+        </div>
+        <textarea id="caption-input" rows="3" placeholder="A kaleidoscope of painted wings dances across the vast and tranquil cerulean sky."></textarea>
+        <p id="analysis-tag" class="analysis-tag"></p>
+
+        <!-- API Key 設定摺疊 -->
+        <details class="api-key-details">
+          <summary>🔑 設定 Gemini API Key (可選)</summary>
+          <div class="api-key-input-box">
+            <input type="password" id="input-api-key" placeholder="貼上 Google AI Studio API Key" />
+            <small>若未設定，點擊重新生成時會改用「文字分析圖片」：本機分析照片的色調與明暗，從示範文案庫挑選最match的一句。</small>
+          </div>
+        </details>
+      </section>
+
+      <!-- 3. 摳圖與位置調整 -->
+      <section class="section">
+        <div class="section-title-row">
+          <h2>3. 摳圖與位置調整</h2>
+          <div class="btn-group">
+            <button id="btn-lock" class="btn-secondary">🔓 未鎖定</button>
+            <button id="btn-randomize" class="btn-secondary">🔀 隨機位置</button>
+          </div>
+        </div>
+        <div class="control-row">
+          <label>摳圖數量 (N): <span id="val-count" class="val-tag">6</span></label>
+          <input type="range" id="input-count" min="1" max="12" value="6" />
+        </div>
+        <p class="hint-text">提示: 滑鼠可在右側下方圖片上直接拖動摳圖矩形，更改取景區域！</p>
+        
+        <div class="control-row">
+          <label>小圖統一縮放倍數: <span id="val-scale" class="val-tag">2.0x</span></label>
+          <input type="range" id="input-scale" min="1.0" max="4.0" step="0.1" value="2.0" />
+          <span class="sub-hint">相對於當前文字字號的高倍率 (預設 2.0 倍)</span>
+        </div>
+
+        <div class="control-row">
+          <label>文字基礎字號: <span id="val-font-size" class="val-tag">32px</span></label>
+          <input type="range" id="input-font-size" min="18" max="48" step="1" value="32" />
+        </div>
+      </section>
+
+      <!-- 4. 樣式與排版主題 -->
+      <section class="section">
+        <h2>4. 樣式與排版主題</h2>
+        <div class="form-group">
+          <label>畫布輸出比例</label>
+          <select id="select-ratio">
+            <option value="3:4" selected>3:4 (預設)</option>
+            <option value="1:1">1:1 正方形</option>
+            <option value="4:5">4:5</option>
+            <option value="9:16">9:16 直式</option>
+            <option value="16:9">16:9 橫式</option>
+            <option value="photo">跟隨照片原始比例</option>
+          </select>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label>字體風格</label>
+            <select id="select-font">
+              <option value="Inter, sans-serif">Inter (無襯線 - 預設)</option>
+              <option value="'Noto Serif TC', serif">Noto Serif (襯線宋體)</option>
+              <option value="Georgia, serif">Georgia (英文襯線)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>括號樣式</label>
+            <select id="select-brackets">
+              <option value="curly">{ 小圖 }</option>
+              <option value="round">( 小圖 )</option>
+              <option value="square">[ 小圖 ]</option>
+              <option value="none">無括號</option>
+            </select>
+          </div>
+        </div>
+
+        <div class="grid-2">
+          <div class="form-group">
+            <label>上半部分背景色</label>
+            <div class="color-picker-wrapper">
+              <input type="color" id="bg-color" value="#ebebeb" />
+              <span id="bg-color-text">#ebebeb</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>文字顏色</label>
+            <div class="color-picker-wrapper">
+              <input type="color" id="text-color" value="#111111" />
+              <span id="text-color-text">#111111</span>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <button id="btn-export" class="btn-primary">📥 導出高清圖片 (1200x1600, 3:4)</button>
+    </aside>
+
+    <!-- 右側 3:4 畫布即時預覽區 -->
+    <main class="preview-area">
+      <div id="canvas-card" class="canvas-card">
+        <!-- 上半部：詩意文字與小圖交織 -->
+        <div id="top-panel" class="top-panel">
+          <div id="poetic-text-container" class="poetic-text-container"></div>
+        </div>
+
+        <!-- 下半部：底圖與取景矩形遮罩 -->
+        <div id="bottom-panel" class="bottom-panel">
+          <img id="source-img" alt="Source" crossorigin="anonymous" />
+          <div id="mask-layer" class="mask-layer"></div>
+        </div>
+      </div>
+
+      <div class="canvas-footer-bar">
+        <span id="canvas-res-label">畫布解析度: 1200 x 1600 (3:4)</span>
+        <span>✋ 按住下半部矩形可自由拖拽</span>
+      </div>
+    </main>
+  </div>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
