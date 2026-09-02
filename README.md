@@ -1,5 +1,7 @@
 # 詩意圖文排版生成器
 
+線上：<https://raphsu.github.io/poetic-cutout-layout/>
+
 工具裡有兩個分頁：
 
 - **詩意摳圖**（本來的功能，見下方）
