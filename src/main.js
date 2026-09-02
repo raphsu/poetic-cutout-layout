@@ -938,7 +938,7 @@ async function callGemini(apiKey, dataUrl) {
   return text.trim().replace(/^"|"$/g, "");
 }
 
-function dataUrlToBlob(dataUrl) {
+export function dataUrlToBlob(dataUrl) {
   const [meta, b64] = dataUrl.split(",");
   const mime = meta.match(/data:(.*);base64/)?.[1] || "image/png";
   const bin = atob(b64);
@@ -947,7 +947,7 @@ function dataUrlToBlob(dataUrl) {
   return new Blob([bytes], { type: mime });
 }
 
-async function getDownloadsCapability() {
+export async function getDownloadsCapability() {
   // Only present when this page is running as a published Claude Artifact.
   if (typeof window.claude?.use !== "function") return null;
   try {
@@ -957,15 +957,15 @@ async function getDownloadsCapability() {
   }
 }
 
-async function saveImage(dataUrl) {
+export async function saveImage(dataUrl, filename = "poetic-layout.png") {
   const downloads = await getDownloadsCapability();
   if (downloads) {
-    await downloads.save({ filename: "poetic-layout.png", data: dataUrlToBlob(dataUrl) });
+    await downloads.save({ filename, data: dataUrlToBlob(dataUrl) });
     return;
   }
   // Plain <a download> for the local/self-hosted build.
   const link = document.createElement("a");
-  link.download = "poetic-layout.png";
+  link.download = filename;
   link.href = dataUrl;
   link.click();
 }

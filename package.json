@@ -13,6 +13,8 @@
     "vite": "^5.4.0"
   },
   "dependencies": {
-    "html-to-image": "^1.11.13"
+    "@imgly/background-removal": "^1.7.0",
+    "html-to-image": "^1.11.13",
+    "onnxruntime-web": "^1.21.0-dev.20250206-d981b153d3"
   }
 }

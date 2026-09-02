@@ -2,6 +2,11 @@
 // inlines html-to-image's UMD bundle as a plain <script> (no bundler/import
 // resolution exists in that runtime) and rewrites main.js's ESM import to
 // read the resulting `window.htmlToImage` global instead.
+//
+// index.html 現在也裝著「人像剪影排版」模式（src/silhouette.js），但那個模式靠
+// @imgly/background-removal 在瀏覽器端摳圖，會去打 staticimgly.com 抓模型 ——
+// Artifact 沙盒的 CSP 不放行那個網域，裝進去也跑不動。所以這支腳本刻意只擷取
+// #mode-poetic 那個 div，維持「詩意摳圖」單一功能的獨立 Artifact。
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -19,10 +24,12 @@ const htmlToImageUmd = readFileSync(
 const preconnectLinks = indexHtml.match(/<link[^>]*rel="preconnect"[^>]*>/g) || [];
 const fontsLinkMatch = indexHtml.match(/<link[^>]*fonts\.googleapis\.com\/css2[^>]*>/g) || [];
 
-const bodyMatch = indexHtml.match(/<div class="app-container">[\s\S]*?<\/div>\s*<\/div>\s*<\/div>\s*<\/div>/);
-// Fallback: grab everything between <body> and the module script tag.
-const bodyContent = indexHtml.match(/<body>([\s\S]*)<script type="module"/)?.[1];
-if (!bodyContent) throw new Error("Could not extract body content from index.html");
+const modeStart = indexHtml.indexOf('<div id="mode-poetic"');
+const modeEnd = indexHtml.indexOf('<div id="mode-silhouette"');
+if (modeStart === -1 || modeEnd === -1) {
+  throw new Error("Could not find #mode-poetic / #mode-silhouette markers in index.html");
+}
+const bodyContent = indexHtml.slice(modeStart, modeEnd);
 
 const adaptedMainJs = mainJs.replace(
   /^import \{ toPng \} from "html-to-image";\s*$/m,

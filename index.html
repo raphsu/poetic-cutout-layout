@@ -10,7 +10,12 @@
   <link rel="stylesheet" href="./src/style.css" />
 </head>
 <body>
-  <div class="app-container">
+  <div class="mode-tabs">
+    <button id="tab-poetic" class="mode-tab active" type="button">詩意摳圖</button>
+    <button id="tab-silhouette" class="mode-tab" type="button">人像剪影排版</button>
+  </div>
+
+  <div id="mode-poetic" class="app-container">
     <!-- 左側設定控制台 -->
     <aside class="sidebar">
       <header class="sidebar-header">
@@ -191,6 +196,178 @@
     </main>
   </div>
 
+  <div id="mode-silhouette" class="app-container mode-hidden">
+    <!-- 左側設定控制台 -->
+    <aside class="sidebar">
+      <header class="sidebar-header">
+        <h1>人像剪影排版 <span class="badge badge-alt">全在瀏覽器端摳圖</span></h1>
+        <p class="subtitle">上傳一張人像照，自動摳圖後排成「剪影＋原色人像」的對半版面（支援 Ctrl+V / Cmd+V 貼上圖片）</p>
+      </header>
+
+      <!-- 1. 上傳圖片 -->
+      <section class="section">
+        <h2>1. 上傳人像照片</h2>
+        <div id="dropzone-2" class="dropzone">
+          <input type="file" id="file-input-2" accept="image/*" hidden />
+          <div class="dropzone-icon">🧍</div>
+          <p>點擊上傳、拖拽圖片到此處，或直接剪貼簿貼上</p>
+        </div>
+        <p id="sil-status" class="analysis-tag"></p>
+
+        <div class="control-row" style="margin-top: 14px;">
+          <label>背景圖片縮放: <span id="val-sil-photo-zoom" class="val-tag">100%</span></label>
+          <input type="range" id="input-sil-photo-zoom" min="10" max="300" step="1" value="100" />
+          <span class="sub-hint">🖐 可直接在右側照片區拖曳調整取景位置</span>
+        </div>
+      </section>
+
+      <!-- 2. 剪影濾鏡 -->
+      <section class="section">
+        <h2>2. 剪影濾鏡</h2>
+        <div class="btn-group btn-group-wrap" id="sil-filter-group">
+          <button class="btn-secondary active" data-filter="solid" type="button">純色</button>
+          <button class="btn-secondary" data-filter="pixelate" type="button">像素化</button>
+          <button class="btn-secondary" data-filter="halftone" type="button">網點</button>
+          <button class="btn-secondary" data-filter="watercolor" type="button">水彩畫</button>
+        </div>
+      </section>
+
+      <!-- 3. 配色 -->
+      <section class="section">
+        <div class="grid-2">
+          <div class="form-group">
+            <label>背景色（分割下半部）</label>
+            <div class="color-picker-wrapper">
+              <input type="color" id="input-bg-color" value="#f2c744" />
+              <span id="bg-color-text-2">#f2c744</span>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>剪影顏色</label>
+            <div class="color-picker-wrapper">
+              <input type="color" id="input-sil-color" value="#2f6f6d" />
+              <span id="sil-color-text">#2f6f6d</span>
+            </div>
+          </div>
+        </div>
+        <div class="swatch-row" id="sil-swatches"></div>
+        <p class="sub-hint">從照片智能提取的主色與互補色，點一下套用到背景色；按住 Shift 點擊套用到剪影色</p>
+      </section>
+
+      <!-- 4. 排版 -->
+      <section class="section">
+        <div class="section-title-row">
+          <h2>4. 排版</h2>
+          <button id="btn-swap" class="btn-secondary">🔀 上下互換</button>
+        </div>
+        <div class="control-row">
+          <label>分割線位置: <span id="val-split" class="val-tag">48%</span></label>
+          <input type="range" id="input-split" min="25" max="70" step="1" value="48" />
+        </div>
+        <label class="checkbox-row">
+          <input type="checkbox" id="input-subject-over" />
+          人像蓋在文字上方
+        </label>
+        <div class="control-row">
+          <label>剪影大小: <span id="val-sil-scale" class="val-tag">78%</span></label>
+          <input type="range" id="input-sil-scale" min="40" max="130" step="1" value="78" />
+        </div>
+        <div class="control-row">
+          <label>剪影水平位置: <span id="val-sil-x" class="val-tag">58%</span></label>
+          <input type="range" id="input-sil-x" min="0" max="100" step="1" value="58" />
+        </div>
+        <div class="control-row">
+          <label>剪影垂直位置: <span id="val-sil-y" class="val-tag">+6%</span></label>
+          <input type="range" id="input-sil-y" min="-30" max="50" step="1" value="6" />
+          <span class="sub-hint">以分割線為基準，數字愈大剪影底部愈往下探進另一色塊</span>
+        </div>
+        <div class="control-row">
+          <label>人像大小: <span id="val-subj-scale" class="val-tag">82%</span></label>
+          <input type="range" id="input-subj-scale" min="40" max="130" step="1" value="82" />
+        </div>
+        <div class="control-row">
+          <label>人像水平位置: <span id="val-subj-x" class="val-tag">4%</span></label>
+          <input type="range" id="input-subj-x" min="0" max="100" step="1" value="4" />
+        </div>
+      </section>
+
+      <!-- 5. 文字 -->
+      <section class="section">
+        <h2>5. 標注文字</h2>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>第一行 · 左（標題）</label>
+            <input type="text" id="input-row1-left" placeholder="Urban Nomad" />
+          </div>
+          <div class="form-group">
+            <label>第一行 · 右（副標）</label>
+            <input type="text" id="input-row1-right" placeholder="A moment of quiet motion" />
+          </div>
+        </div>
+        <div class="grid-2">
+          <div class="form-group">
+            <label>第二行 · 左（概念）</label>
+            <input type="text" id="input-row2-left" placeholder="Concept by Studio" />
+          </div>
+          <div class="form-group">
+            <label>第二行 · 右（色號）</label>
+            <input type="text" id="input-row2-right" placeholder="Amber-Teal" />
+          </div>
+        </div>
+        <button id="btn-fill-colorcode" class="btn-secondary">🎨 帶入目前色號到「色號」欄位</button>
+
+        <div class="grid-2" style="margin-top: 14px;">
+          <div class="form-group">
+            <label>字體風格</label>
+            <select id="select-sil-font">
+              <option value="Inter, sans-serif">Inter (無襯線 - 預設)</option>
+              <option value="'Noto Serif TC', serif">Noto Serif (襯線宋體)</option>
+              <option value="Georgia, serif">Georgia (英文襯線)</option>
+            </select>
+          </div>
+          <div class="form-group">
+            <label>文字顏色</label>
+            <div class="color-picker-wrapper">
+              <input type="color" id="input-sil-textcolor" value="#111111" />
+              <span id="sil-textcolor-text">#111111</span>
+            </div>
+          </div>
+        </div>
+        <div class="control-row">
+          <label>文字字級: <span id="val-sil-fontsize" class="val-tag">22px</span></label>
+          <input type="range" id="input-sil-fontsize" min="12" max="36" step="1" value="22" />
+        </div>
+      </section>
+
+      <button id="btn-export-2" class="btn-primary">📥 導出高清圖片 (1200x1600, 3:4)</button>
+    </aside>
+
+    <!-- 右側 3:4 畫布即時預覽區 -->
+    <main class="preview-area">
+      <div class="canvas-holder" style="width: min(542px, 100%);">
+        <div id="canvas-card-2" class="canvas-card">
+          <div id="sil-photo-band" class="sil-photo-band">
+            <img id="sil-source-img" alt="Source" crossorigin="anonymous" />
+          </div>
+          <div id="sil-solid-band" class="sil-solid-band"></div>
+          <img id="sil-silhouette" class="sil-silhouette" alt="" />
+          <div id="sil-text-layer" class="sil-text-layer">
+            <div id="sil-row1" class="sil-text-row"></div>
+            <div id="sil-row2" class="sil-text-row"></div>
+          </div>
+          <img id="sil-subject-img" class="sil-subject-img" alt="Subject cutout" />
+          <div id="sil-empty" class="sil-empty">先上傳一張人像照片開始創作</div>
+        </div>
+      </div>
+
+      <div class="canvas-footer-bar">
+        <span id="sil-canvas-res-label">畫布解析度: 1200 x 1600 (3:4)</span>
+        <span>自動摳圖：@imgly/background-removal（純瀏覽器端）</span>
+      </div>
+    </main>
+  </div>
+
   <script type="module" src="./src/main.js"></script>
+  <script type="module" src="./src/silhouette.js"></script>
 </body>
 </html>
