@@ -60,6 +60,7 @@ const els = {
   apiKeyInput: document.getElementById("input-api-key"),
   btnLock: document.getElementById("btn-lock"),
   btnRandomize: document.getElementById("btn-randomize"),
+  btnAutoPlace: document.getElementById("btn-auto-place"),
   inputCount: document.getElementById("input-count"),
   valCount: document.getElementById("val-count"),
   inputScale: document.getElementById("input-scale"),
@@ -188,6 +189,11 @@ function bindEvents() {
     els.btnLock.classList.toggle("active", state.locked);
   });
 
+  els.btnAutoPlace.addEventListener("click", () => {
+    generateRectsAuto(state.count);
+    renderAll();
+  });
+
   els.btnRandomize.addEventListener("click", () => {
     generateRects(state.count);
     renderAll();
@@ -199,7 +205,7 @@ function bindEvents() {
     if (state.locked) {
       adjustRectsToCount(state.count);
     } else {
-      generateRects(state.count);
+      generateRectsAuto(state.count);
     }
     renderAll();
   });
@@ -358,9 +364,139 @@ function finalizeImage(img, src, file) {
   els.dropzone.classList.add("has-image");
   els.dropzone.querySelector("p").textContent = file.name;
   els.analysisTag.classList.remove("show");
-  if (!state.rects.length || !state.locked) generateRects(state.count);
+  // 順序很重要：「跟隨照片比例」會改變畫布形狀，必須先套用比例，
+  // 自動對準拿到的取景幾何才是對的
   if (state.ratio === "photo") applyCanvasRatio();
+  if (!state.rects.length || !state.locked) generateRectsAuto(state.count);
   renderAll();
+}
+
+/* ---------- 摳圖框自動對準重點 ---------- */
+
+// 分析用縮圖的寬度。夠小才跑得快，夠大才看得出局部差異
+const SALIENCY_W = 72;
+
+// 把「目前畫面上看得到的那塊照片」畫進一張小圖來分析。
+// 關鍵是沿用 getCoverGeometry() 的縮放與平移，分析座標才會跟
+// 摳圖框的容器百分比座標對得起來。
+function buildInterestMap(geom) {
+  const sw = SALIENCY_W;
+  const sh = Math.max(1, Math.round((sw * geom.containerH) / geom.containerW));
+  const k = sw / geom.containerW; // 容器像素 → 分析像素
+
+  const c = document.createElement("canvas");
+  c.width = sw;
+  c.height = sh;
+  const ctx = c.getContext("2d", { willReadFrequently: true });
+  ctx.drawImage(state.imgEl, geom.offX * k, geom.offY * k, geom.dispW * k, geom.dispH * k);
+
+  let px;
+  try {
+    px = ctx.getImageData(0, 0, sw, sh).data;
+  } catch {
+    return null; // 來源都是 data URL，理論上不會汙染畫布，保險起見
+  }
+
+  const luma = new Float32Array(sw * sh);
+  const sat = new Float32Array(sw * sh);
+  for (let i = 0, p = 0; i < luma.length; i++, p += 4) {
+    const r = px[p];
+    const g = px[p + 1];
+    const b = px[p + 2];
+    luma[i] = (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+    const max = Math.max(r, g, b);
+    const min = Math.min(r, g, b);
+    sat[i] = max === 0 ? 0 : (max - min) / max;
+  }
+
+  // 邊緣能量（相鄰亮度差）為主、彩度為輔：有輪廓有細節的地方分數高，
+  // 一片天空或純色背景趨近 0。想改偏好就調這兩個係數。
+  const interest = new Float32Array(sw * sh);
+  for (let y = 0; y < sh; y++) {
+    for (let x = 0; x < sw; x++) {
+      const i = y * sw + x;
+      const dx = x + 1 < sw ? Math.abs(luma[i + 1] - luma[i]) : 0;
+      const dy = y + 1 < sh ? Math.abs(luma[i + sw] - luma[i]) : 0;
+      interest[i] = (dx + dy) * 3 + sat[i] * 0.35;
+    }
+  }
+
+  // 照片實際可見的範圍。縮到比面板小時四周會露出底色，
+  // 框放到那裡會是一片空白，要排除。
+  return {
+    interest,
+    sw,
+    sh,
+    bounds: {
+      x0: Math.max(0, geom.offX) * k,
+      y0: Math.max(0, geom.offY) * k,
+      x1: Math.min(geom.containerW, geom.offX + geom.dispW) * k,
+      y1: Math.min(geom.containerH, geom.offY + geom.dispH) * k,
+    },
+  };
+}
+
+function scoreRegion(map, x0, y0, w, h) {
+  let sum = 0;
+  let n = 0;
+  const xEnd = Math.min(map.sw, Math.ceil(x0 + w));
+  const yEnd = Math.min(map.sh, Math.ceil(y0 + h));
+  for (let y = Math.max(0, Math.floor(y0)); y < yEnd; y++) {
+    for (let x = Math.max(0, Math.floor(x0)); x < xEnd; x++) {
+      sum += map.interest[y * map.sw + x];
+      n++;
+    }
+  }
+  return n ? sum / n : 0;
+}
+
+function findBestSpot(map, wPct, hPct, taken) {
+  const w = (wPct / 100) * map.sw;
+  const h = (hPct / 100) * map.sh;
+  const stepX = Math.max(1, Math.round(map.sw / 28));
+  const stepY = Math.max(1, Math.round(map.sh / 28));
+
+  const free = [];
+  const clashing = [];
+  for (let y = map.bounds.y0; y + h <= map.bounds.y1; y += stepY) {
+    for (let x = map.bounds.x0; x + w <= map.bounds.x1; x += stepX) {
+      const cand = { xPct: (x / map.sw) * 100, yPct: (y / map.sh) * 100, wPct, hPct };
+      cand.score = scoreRegion(map, x, y, w, h);
+      (taken.some((r) => rectOverlap(r, cand)) ? clashing : free).push(cand);
+    }
+  }
+
+  const pool = free.length ? free : clashing;
+  if (!pool.length) return { xPct: 50 - wPct / 2, yPct: 50 - hPct / 2, wPct, hPct };
+
+  // 不取單一最高分，而是從前段班裡隨機挑：重複按不會每次一模一樣，
+  // 但都還是落在有內容的地方。
+  pool.sort((a, b) => b.score - a.score);
+  const top = pool.slice(0, Math.max(1, Math.round(pool.length * 0.12)));
+  const pick = top[Math.floor(Math.random() * top.length)];
+  return { xPct: pick.xPct, yPct: pick.yPct, wPct, hPct };
+}
+
+function generateRectsAuto(n) {
+  // 任何一步失敗就退回隨機撒點，不要讓上傳流程整個卡住
+  try {
+    const geom = getCoverGeometry();
+    if (!geom) return generateRects(n);
+    const map = buildInterestMap(geom);
+    if (!map) return generateRects(n);
+
+    const rects = [];
+    for (let i = 0; i < n; i++) {
+      // 尺寸仍隨機，維持原本大小不一的視覺變化；只有「位置」改成看分數
+      const wPct = 8 + Math.random() * 9;
+      const hPct = 8 + Math.random() * 9;
+      rects.push(findBestSpot(map, wPct, hPct, rects));
+    }
+    state.rects = rects;
+  } catch (err) {
+    console.error("自動對準失敗，改用隨機位置", err);
+    generateRects(n);
+  }
 }
 
 function generateRects(n) {
