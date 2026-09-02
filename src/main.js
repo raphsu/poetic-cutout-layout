@@ -35,7 +35,7 @@ const state = {
   rects: [], // {xPct, yPct, wPct, hPct} in % of bottom-panel container
   count: 6,
   scale: 2.0,
-  fontSize: 32,
+  fontSize: 22,
   fontFamily: "Inter, sans-serif",
   bracket: "round",
   bgColor: "#ebebeb",
@@ -61,6 +61,7 @@ const els = {
   btnLock: document.getElementById("btn-lock"),
   btnRandomize: document.getElementById("btn-randomize"),
   btnAutoPlace: document.getElementById("btn-auto-place"),
+  paneTabs: document.getElementById("pane-tabs"),
   inputCount: document.getElementById("input-count"),
   valCount: document.getElementById("val-count"),
   inputScale: document.getElementById("input-scale"),
@@ -106,6 +107,29 @@ function init() {
   bindEvents();
   setRulersVisible(state.showRulers);
   applyCanvasRatio();
+  switchPane("settings"); // 手機上先看設定；寬螢幕這個屬性不影響版面
+}
+
+// 手機版一次只顯示一個面板。切換掛在 body 上，兩個模式（詩意摳圖／人像剪影）共用。
+function switchPane(pane) {
+  document.body.dataset.pane = pane;
+  els.paneTabs.querySelectorAll(".pane-tab").forEach((b) => {
+    b.classList.toggle("is-active", b.dataset.pane === pane);
+  });
+
+  // 面板被 display:none 時 getBoundingClientRect() 全是 0，小圖取景與尺標刻度
+  // 都靠這個量測，切回預覽必須重算。
+  //
+  // 讀 offsetHeight 是為了逼瀏覽器立刻重算版面（面板剛從 display:none 變回來），
+  // 之後再派發 resize，讓 main.js 的 renderAll 與 silhouette.js 的
+  // applyPhotoTransform 各自用既有處理器重新量測。
+  //
+  // 這裡刻意不用 requestAnimationFrame：頁面沒在繪製時（背景分頁、視窗最小化）
+  // rAF 不會執行，重新量測就會靜默失效，小圖會整批變成空白方塊。
+  if (pane === "preview") {
+    void document.body.offsetHeight;
+    window.dispatchEvent(new Event("resize"));
+  }
 }
 
 function applyStyleVars() {
@@ -187,6 +211,11 @@ function bindEvents() {
     state.locked = !state.locked;
     els.btnLock.textContent = state.locked ? "\u{1F512} 已鎖定" : "\u{1F513} 未鎖定";
     els.btnLock.classList.toggle("active", state.locked);
+  });
+
+  els.paneTabs.addEventListener("click", (e) => {
+    const btn = e.target.closest(".pane-tab");
+    if (btn) switchPane(btn.dataset.pane);
   });
 
   els.btnAutoPlace.addEventListener("click", () => {

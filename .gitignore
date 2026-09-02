@@ -1,4 +1,7 @@
 node_modules/
 
+# Vite 建置產物，CI 會自己 build 後部署到 Pages
+dist/
+
 # Artifact 打包產物，用 node scripts/build-artifact.mjs 重新產生
 artifact/

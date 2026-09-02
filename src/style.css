@@ -18,14 +18,24 @@
 html, body {
   margin: 0;
   height: 100%;
+  height: 100dvh;              /* iOS Safari 的網址列會讓 100vh 算過頭 */
   background: var(--bg-app);
   color: var(--text-main);
   font-family: "Inter", "Noto Sans TC", sans-serif;
+  overscroll-behavior-y: none; /* 裝成 app 後不要有整頁被拉出來的橡皮筋效果 */
+}
+
+/* body 當直向 flex 容器：上方模式列、中間主體、下方分頁籤各自佔位，
+   主體用 flex:1 吃掉剩下的高度。這樣不必去猜那兩條列有多高。 */
+body {
+  display: flex;
+  flex-direction: column;
 }
 
 .app-container {
   display: flex;
-  height: 100vh;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
@@ -470,21 +480,55 @@ select {
   color: var(--text-dim);
 }
 
+/* 分頁籤只在窄螢幕出現 */
+.pane-tabs {
+  display: none;
+}
+
 @media (max-width: 860px) {
   .app-container {
     flex-direction: column;
-    height: auto;
-    min-height: 100vh;
-    overflow: visible;
   }
-  .sidebar {
+
+  /* 一次只顯示一個面板，畫布才有足夠空間可以操作 */
+  .sidebar,
+  .preview-area {
     width: 100%;
-    max-height: 60vh;
+    max-height: none;
     border-right: none;
-    border-bottom: 1px solid var(--border-subtle);
+    flex: 1;
+    min-height: 0;
+  }
+  body[data-pane="preview"] .sidebar,
+  body[data-pane="settings"] .preview-area {
+    display: none;
   }
   .preview-area {
-    padding: 24px 16px;
+    padding: 16px 12px;
+    overflow: auto;
+  }
+
+  .pane-tabs {
+    display: flex;
+    background: var(--bg-sidebar);
+    border-top: 1px solid var(--border-subtle);
+    padding-bottom: env(safe-area-inset-bottom, 0px); /* 避開 iPhone 底部的home indicator */
+  }
+  .pane-tab {
+    flex: 1;
+    appearance: none;
+    background: none;
+    border: none;
+    color: var(--text-dim);
+    font-family: inherit;
+    font-size: 14px;
+    padding: 15px 0;
+    cursor: pointer;
+  }
+  .pane-tab.is-active {
+    color: var(--text-main);
+    font-weight: 600;
+    box-shadow: inset 0 -2px 0 var(--accent);
   }
 }
 

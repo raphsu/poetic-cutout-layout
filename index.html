@@ -2,8 +2,24 @@
 <html lang="zh-Hant">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <title>詩意圖文排版生成器</title>
+  <link rel="manifest" href="./manifest.json" />
+  <meta name="theme-color" content="#12131d" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="詩意排版" />
+  <link rel="apple-touch-icon" sizes="180x180" href="./icons/apple-touch-icon-180.png" />
+  <script>
+    // 刻意放在 head：scripts/build-artifact.mjs 只擷取 <body> 內容，
+    // 放 body 會被打包進 Artifact 單檔版，那個環境沒有 sw.js 會噴無意義的錯
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js").catch(() => {});
+      });
+    }
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Noto+Serif+TC:wght@400;600&display=swap" rel="stylesheet">
@@ -81,8 +97,8 @@
         </div>
 
         <div class="control-row">
-          <label>文字基礎字號: <span id="val-font-size" class="val-tag">32px</span></label>
-          <input type="range" id="input-font-size" min="18" max="48" step="1" value="32" />
+          <label>文字基礎字號: <span id="val-font-size" class="val-tag">22px</span></label>
+          <input type="range" id="input-font-size" min="18" max="48" step="1" value="22" />
         </div>
       </section>
 
@@ -367,6 +383,12 @@
       </div>
     </main>
   </div>
+
+  <!-- 只在窄螢幕顯示。兩個模式共用同一組，切換是掛在 body 的 data-pane 上 -->
+  <nav class="pane-tabs" id="pane-tabs">
+    <button type="button" class="pane-tab" data-pane="preview">預覽</button>
+    <button type="button" class="pane-tab is-active" data-pane="settings">設定</button>
+  </nav>
 
   <script type="module" src="./src/main.js"></script>
   <script type="module" src="./src/silhouette.js"></script>
