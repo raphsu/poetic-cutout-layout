@@ -32,7 +32,10 @@ if (adaptedMainJs === mainJs) {
   throw new Error("Failed to rewrite html-to-image import — check src/main.js's import line");
 }
 
-const out = `<title>詩意圖文排版生成器</title>
+// charset 必須落在檔案前 1024 bytes 內。發布成 Artifact 時平台外層已經有一份，
+// 這行是為了「直接用瀏覽器開啟這支單檔」的情境 —— 少了它中文會變亂碼。
+const out = `<meta charset="utf-8">
+<title>詩意圖文排版生成器</title>
 ${preconnectLinks.join("\n")}
 ${fontsLinkMatch.join("\n")}
 <style>
