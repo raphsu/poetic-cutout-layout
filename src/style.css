@@ -270,8 +270,123 @@ select {
   overflow: auto;
 }
 
+/* ---------- 尺標與參考線 ---------- */
+/* 這一整組都在 .canvas-card 之外，匯出時擷取的是卡片本身，所以不會被拍進去 */
+.canvas-stage {
+  --ruler-size: 22px;
+  --guide-color: #00b8d4;
+  display: grid;
+  grid-template-columns: var(--ruler-size) 1fr;
+  grid-template-rows: var(--ruler-size) auto;
+  width: min(542px, 100%);
+}
+.canvas-stage.rulers-off {
+  --ruler-size: 0px;
+}
+.canvas-stage.rulers-off .ruler,
+.canvas-stage.rulers-off .ruler-corner {
+  display: none;
+}
+
+.ruler {
+  display: block;
+  background: var(--bg-input);
+}
+.ruler-top {
+  grid-column: 2;
+  grid-row: 1;
+  width: 100%;
+  height: var(--ruler-size);
+  border-bottom: 1px solid var(--border-subtle);
+  cursor: ns-resize;
+}
+.ruler-left {
+  grid-column: 1;
+  grid-row: 2;
+  width: var(--ruler-size);
+  height: 100%;
+  border-right: 1px solid var(--border-subtle);
+  cursor: ew-resize;
+}
+.ruler-corner {
+  grid-column: 1;
+  grid-row: 1;
+  background: var(--bg-input);
+  border-right: 1px solid var(--border-subtle);
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.canvas-holder {
+  grid-column: 2;
+  grid-row: 2;
+  position: relative;
+}
+
+.guide-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+.guide {
+  position: absolute;
+  pointer-events: auto;
+  touch-action: none;
+}
+/* 線本身只有 1px，另外墊一塊透明的區域才抓得住 */
+.guide::before {
+  content: "";
+  position: absolute;
+}
+.guide-h {
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--guide-color);
+  cursor: ns-resize;
+}
+.guide-h::before {
+  left: 0;
+  right: 0;
+  top: -4px;
+  height: 9px;
+}
+.guide-v {
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--guide-color);
+  cursor: ew-resize;
+}
+.guide-v::before {
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  width: 9px;
+}
+.guide.dragging {
+  border-color: #fff;
+}
+
+.guide-label {
+  position: absolute;
+  background: var(--guide-color);
+  color: #04252b;
+  font-size: 10px;
+  font-weight: 600;
+  padding: 1px 5px;
+  border-radius: 3px;
+  white-space: nowrap;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+}
+.guide-h .guide-label { left: 4px; top: 3px; }
+.guide-v .guide-label { top: 4px; left: 4px; }
+
+.btn-group-wrap {
+  flex-wrap: wrap;
+}
+
 .canvas-card {
-  width: min(520px, 100%);
+  width: 100%;
   aspect-ratio: 3 / 4;
   background: #fff;
   border-radius: 4px;
@@ -348,7 +463,7 @@ select {
 .mask-rect:active { cursor: grabbing; }
 
 .canvas-footer-bar {
-  width: min(520px, 100%);
+  width: min(542px, 100%);
   display: flex;
   justify-content: space-between;
   font-size: 12px;

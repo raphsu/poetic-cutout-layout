@@ -139,21 +139,48 @@
         </div>
       </section>
 
+      <!-- 5. 尺標與參考線 -->
+      <section class="section">
+        <div class="section-title-row">
+          <h2>5. 尺標與參考線</h2>
+          <button id="btn-toggle-rulers" class="btn-secondary">📐 顯示</button>
+        </div>
+        <div class="btn-group btn-group-wrap">
+          <button id="btn-guide-center" class="btn-secondary">＋ 中線</button>
+          <button id="btn-guide-thirds" class="btn-secondary">＋ 三分線</button>
+          <button id="btn-guide-clear" class="btn-secondary">清除</button>
+        </div>
+        <p class="hint-text" style="margin-top: 10px;">
+          從上方或左方尺標往畫布拖曳可拉出參考線；拖到畫布外或雙擊即可刪除。
+          尺標刻度是<b>匯出後的實際像素</b>，不是螢幕像素。參考線只是輔助，不會進到匯出的圖裡。
+        </p>
+      </section>
+
       <button id="btn-export" class="btn-primary">📥 導出高清圖片 (1200x1600, 3:4)</button>
     </aside>
 
     <!-- 右側 3:4 畫布即時預覽區 -->
     <main class="preview-area">
-      <div id="canvas-card" class="canvas-card">
-        <!-- 上半部：詩意文字與小圖交織 -->
-        <div id="top-panel" class="top-panel">
-          <div id="poetic-text-container" class="poetic-text-container"></div>
-        </div>
+      <!-- 尺標與參考線都在 #canvas-card 之外，所以匯出時不可能被擷取到 -->
+      <div id="canvas-stage" class="canvas-stage">
+        <div class="ruler-corner"></div>
+        <canvas id="ruler-top" class="ruler ruler-top"></canvas>
+        <canvas id="ruler-left" class="ruler ruler-left"></canvas>
 
-        <!-- 下半部：底圖與取景矩形遮罩 -->
-        <div id="bottom-panel" class="bottom-panel">
-          <img id="source-img" alt="Source" crossorigin="anonymous" />
-          <div id="mask-layer" class="mask-layer"></div>
+        <div class="canvas-holder">
+          <div id="canvas-card" class="canvas-card">
+            <!-- 上半部：詩意文字與小圖交織 -->
+            <div id="top-panel" class="top-panel">
+              <div id="poetic-text-container" class="poetic-text-container"></div>
+            </div>
+
+            <!-- 下半部：底圖與取景矩形遮罩 -->
+            <div id="bottom-panel" class="bottom-panel">
+              <img id="source-img" alt="Source" crossorigin="anonymous" />
+              <div id="mask-layer" class="mask-layer"></div>
+            </div>
+          </div>
+          <div id="guide-layer" class="guide-layer"></div>
         </div>
       </div>
 

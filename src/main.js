@@ -48,6 +48,8 @@ const state = {
   photoZoom: 1,
   panU: 0, // -1..1, fraction of available pan slack
   panV: 0,
+  showRulers: false,
+  guides: [], // {axis:'x'|'y', pos} pos 是 0..1 的比例，換比例時才不會跑掉
 };
 
 const els = {
@@ -72,6 +74,14 @@ const els = {
   valPhotoZoom: document.getElementById("val-photo-zoom"),
   inputTopRatio: document.getElementById("input-top-ratio"),
   valTopRatio: document.getElementById("val-top-ratio"),
+  canvasStage: document.getElementById("canvas-stage"),
+  rulerTop: document.getElementById("ruler-top"),
+  rulerLeft: document.getElementById("ruler-left"),
+  guideLayer: document.getElementById("guide-layer"),
+  btnToggleRulers: document.getElementById("btn-toggle-rulers"),
+  btnGuideCenter: document.getElementById("btn-guide-center"),
+  btnGuideThirds: document.getElementById("btn-guide-thirds"),
+  btnGuideClear: document.getElementById("btn-guide-clear"),
   analysisTag: document.getElementById("analysis-tag"),
   bgColor: document.getElementById("bg-color"),
   bgColorText: document.getElementById("bg-color-text"),
@@ -93,6 +103,7 @@ function init() {
   state.caption = els.captionInput.placeholder;
   applyStyleVars();
   bindEvents();
+  setRulersVisible(state.showRulers);
   applyCanvasRatio();
 }
 
@@ -133,6 +144,8 @@ function applyCanvasRatio() {
   // background image and masks/chips need to re-measure against it.
   applyBackgroundTransform();
   renderPoeticText();
+  updateRulers();
+  renderGuides();
 }
 
 function bindEvents() {
@@ -252,6 +265,26 @@ function bindEvents() {
   });
 
   els.bottomPanel.addEventListener("pointerdown", startPan);
+
+  // 上方尺標拉出水平線、左方尺標拉出垂直線（與一般設計工具的方向一致）
+  els.rulerTop.addEventListener("pointerdown", (ev) => startGuideFromRuler(ev, "y"));
+  els.rulerLeft.addEventListener("pointerdown", (ev) => startGuideFromRuler(ev, "x"));
+
+  els.btnToggleRulers.addEventListener("click", () => setRulersVisible(!state.showRulers));
+
+  els.btnGuideCenter.addEventListener("click", () =>
+    addGuides([{ axis: "x", pos: 0.5 }, { axis: "y", pos: 0.5 }])
+  );
+  els.btnGuideThirds.addEventListener("click", () =>
+    addGuides([
+      { axis: "x", pos: 1 / 3 }, { axis: "x", pos: 2 / 3 },
+      { axis: "y", pos: 1 / 3 }, { axis: "y", pos: 2 / 3 },
+    ])
+  );
+  els.btnGuideClear.addEventListener("click", () => {
+    state.guides = [];
+    renderGuides();
+  });
 }
 
 function startPan(e) {
@@ -378,6 +411,8 @@ function renderAll() {
   applyBackgroundTransform();
   renderMasks();
   renderPoeticText();
+  updateRulers();
+  renderGuides();
 }
 
 function renderMasks() {
@@ -425,6 +460,186 @@ function startDrag(e, index, el) {
 
 function clamp(v, min, max) {
   return Math.min(Math.max(v, min), max);
+}
+
+/* ---------- 尺標與參考線 ---------- */
+
+// 尺標刻度用「匯出後的實際像素」，而不是螢幕像素 ——
+// 使用者要對齊的是成品的構圖，螢幕上顯示多大並不重要。
+function getExportSize() {
+  const [w, h] = getRatioWH();
+  return { w: EXPORT_BASE_WIDTH, h: Math.round((EXPORT_BASE_WIDTH * h) / w) };
+}
+
+const TICK_STEPS = [10, 20, 25, 50, 100, 200, 250, 500, 1000, 2000];
+const RULER_THICKNESS = 22;
+
+function pickTickStep(scale) {
+  // 相鄰標籤至少隔開 55px，否則數字會擠成一團
+  return TICK_STEPS.find((s) => s * scale >= 55) || TICK_STEPS[TICK_STEPS.length - 1];
+}
+
+function drawRuler(canvas, exportLen, screenLen, horizontal) {
+  if (!screenLen || !exportLen) return;
+  const dpr = window.devicePixelRatio || 1;
+  canvas.width = Math.round((horizontal ? screenLen : RULER_THICKNESS) * dpr);
+  canvas.height = Math.round((horizontal ? RULER_THICKNESS : screenLen) * dpr);
+
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const css = getComputedStyle(document.documentElement);
+  const bg = css.getPropertyValue("--bg-input").trim() || "#21222f";
+  const fg = css.getPropertyValue("--text-dim").trim() || "#9092a8";
+
+  const w = horizontal ? screenLen : RULER_THICKNESS;
+  const h = horizontal ? RULER_THICKNESS : screenLen;
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, w, h);
+
+  const scale = screenLen / exportLen;
+  const step = pickTickStep(scale);
+  const minor = step / 5;
+
+  ctx.strokeStyle = fg;
+  ctx.fillStyle = fg;
+  ctx.font = "9px Inter, sans-serif";
+  ctx.lineWidth = 1;
+
+  for (let v = 0; v <= exportLen + 0.5; v += minor) {
+    const p = Math.round(v * scale) + 0.5;
+    const isMajor = Math.abs(v % step) < 0.001 || Math.abs((v % step) - step) < 0.001;
+    const len = isMajor ? 8 : 4;
+
+    ctx.beginPath();
+    if (horizontal) {
+      ctx.moveTo(p, RULER_THICKNESS);
+      ctx.lineTo(p, RULER_THICKNESS - len);
+    } else {
+      ctx.moveTo(RULER_THICKNESS, p);
+      ctx.lineTo(RULER_THICKNESS - len, p);
+    }
+    ctx.stroke();
+
+    if (isMajor && v > 0 && v < exportLen - step * 0.3) {
+      const label = String(Math.round(v));
+      if (horizontal) {
+        ctx.fillText(label, p + 3, 9);
+      } else {
+        // 直式尺標的數字轉 90 度，才排得下
+        ctx.save();
+        ctx.translate(9, p + 3);
+        ctx.rotate(-Math.PI / 2);
+        ctx.fillText(label, 0, 0);
+        ctx.restore();
+      }
+    }
+  }
+}
+
+function updateRulers() {
+  if (!state.showRulers) return;
+  const rect = els.canvasCard.getBoundingClientRect();
+  const ex = getExportSize();
+  drawRuler(els.rulerTop, ex.w, rect.width, true);
+  drawRuler(els.rulerLeft, ex.h, rect.height, false);
+}
+
+function guidePosFromEvent(ev, axis) {
+  const r = els.canvasCard.getBoundingClientRect();
+  return axis === "x" ? (ev.clientX - r.left) / r.width : (ev.clientY - r.top) / r.height;
+}
+
+function updateGuideEl(el, g) {
+  const ex = getExportSize();
+  const label = el.querySelector(".guide-label");
+  if (g.axis === "x") {
+    el.style.left = g.pos * 100 + "%";
+    label.textContent = Math.round(g.pos * ex.w) + " px";
+  } else {
+    el.style.top = g.pos * 100 + "%";
+    label.textContent = Math.round(g.pos * ex.h) + " px";
+  }
+}
+
+function renderGuides() {
+  els.guideLayer.innerHTML = "";
+  if (!state.showRulers) return;
+
+  state.guides.forEach((g) => {
+    const el = document.createElement("div");
+    el.className = `guide guide-${g.axis === "x" ? "v" : "h"}`;
+    const label = document.createElement("span");
+    label.className = "guide-label";
+    el.appendChild(label);
+    updateGuideEl(el, g);
+
+    el.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation(); // 別讓底下的照片跟著平移
+      beginGuideDrag(ev, g, el);
+    });
+    el.addEventListener("dblclick", () => {
+      state.guides = state.guides.filter((x) => x !== g);
+      renderGuides();
+    });
+
+    els.guideLayer.appendChild(el);
+  });
+}
+
+function beginGuideDrag(startEv, guide, el) {
+  el.classList.add("dragging");
+  let raw = guidePosFromEvent(startEv, guide.axis);
+  guide.pos = clamp(raw, 0, 1);
+  updateGuideEl(el, guide);
+
+  const onMove = (ev) => {
+    raw = guidePosFromEvent(ev, guide.axis);
+    guide.pos = clamp(raw, 0, 1);
+    updateGuideEl(el, guide);
+  };
+  const onUp = () => {
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerup", onUp);
+    el.classList.remove("dragging");
+    // 拖出畫布就當作丟棄，跟一般設計工具一致
+    if (raw < -0.02 || raw > 1.02) {
+      state.guides = state.guides.filter((g) => g !== guide);
+    }
+    renderGuides();
+  };
+  window.addEventListener("pointermove", onMove);
+  window.addEventListener("pointerup", onUp);
+}
+
+function startGuideFromRuler(ev, axis) {
+  if (!state.showRulers) return;
+  ev.preventDefault();
+  const guide = { axis, pos: clamp(guidePosFromEvent(ev, axis), 0, 1) };
+  state.guides.push(guide);
+  renderGuides();
+  beginGuideDrag(ev, guide, els.guideLayer.lastElementChild);
+}
+
+function setRulersVisible(visible) {
+  state.showRulers = visible;
+  els.canvasStage.classList.toggle("rulers-off", !visible);
+  els.btnToggleRulers.textContent = visible ? "📐 隱藏" : "📐 顯示";
+  els.btnToggleRulers.classList.toggle("active", visible);
+  // 版面寬度會因為尺標佔位而改變，小圖的取景幾何要重算
+  requestAnimationFrame(() => {
+    updateRulers();
+    renderGuides();
+    applyBackgroundTransform();
+    renderPoeticText();
+  });
+}
+
+function addGuides(list) {
+  if (!state.showRulers) setRulersVisible(true);
+  state.guides.push(...list);
+  renderGuides();
 }
 
 function getCoverGeometry() {
