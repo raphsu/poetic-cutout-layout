@@ -282,7 +282,7 @@ select {
 }
 
 .top-panel {
-  height: 47%;
+  height: var(--top-ratio, 47%);
   flex-shrink: 0;
   background: var(--panel-bg, #ebebeb);
   display: flex;

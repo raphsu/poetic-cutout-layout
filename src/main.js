@@ -44,6 +44,7 @@ const state = {
   captionIndex: -1,
   geminiModel: null,
   ratio: "3:4",
+  topRatio: 47,
   photoZoom: 1,
   panU: 0, // -1..1, fraction of available pan slack
   panV: 0,
@@ -69,6 +70,8 @@ const els = {
   canvasResLabel: document.getElementById("canvas-res-label"),
   inputPhotoZoom: document.getElementById("input-photo-zoom"),
   valPhotoZoom: document.getElementById("val-photo-zoom"),
+  inputTopRatio: document.getElementById("input-top-ratio"),
+  valTopRatio: document.getElementById("val-top-ratio"),
   analysisTag: document.getElementById("analysis-tag"),
   bgColor: document.getElementById("bg-color"),
   bgColorText: document.getElementById("bg-color-text"),
@@ -96,6 +99,7 @@ function init() {
 function applyStyleVars() {
   els.canvasCard.style.setProperty("--panel-bg", state.bgColor);
   els.canvasCard.style.setProperty("--panel-text", state.textColor);
+  els.canvasCard.style.setProperty("--top-ratio", state.topRatio + "%");
   els.poeticText.style.setProperty("--poetic-font-size", state.fontSize + "px");
   els.poeticText.style.setProperty("--poetic-font-family", state.fontFamily);
 }
@@ -230,6 +234,15 @@ function bindEvents() {
   els.btnExport.addEventListener("click", exportImage);
 
   window.addEventListener("resize", () => renderAll());
+
+  els.inputTopRatio.addEventListener("input", () => {
+    state.topRatio = Number(els.inputTopRatio.value);
+    els.valTopRatio.textContent = state.topRatio + "%";
+    applyStyleVars();
+    // 分割位置一動，下半部的取景區高度就變了，背景與小圖都要重算
+    applyBackgroundTransform();
+    renderPoeticText();
+  });
 
   els.inputPhotoZoom.addEventListener("input", () => {
     state.photoZoom = Number(els.inputPhotoZoom.value) / 100;
@@ -423,8 +436,10 @@ function getCoverGeometry() {
   const scale = baseScale * state.photoZoom;
   const dispW = iw * scale;
   const dispH = ih * scale;
-  const maxOffX = Math.max(0, (dispW - containerRect.width) / 2);
-  const maxOffY = Math.max(0, (dispH - containerRect.height) / 2);
+  // 用絕對差值：照片比面板大時是「可裁切的餘裕」，比面板小時是「可挪移的空間」。
+  // 原本用 Math.max(0, ...)，縮到比面板小就變成 0，整個拖不動。
+  const maxOffX = Math.abs(dispW - containerRect.width) / 2;
+  const maxOffY = Math.abs(dispH - containerRect.height) / 2;
   const offX = (containerRect.width - dispW) / 2 + state.panU * maxOffX;
   const offY = (containerRect.height - dispH) / 2 + state.panV * maxOffY;
   return { containerW: containerRect.width, containerH: containerRect.height, dispW, dispH, offX, offY, maxOffX, maxOffY };
