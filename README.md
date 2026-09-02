@@ -167,6 +167,14 @@ node scripts/build-artifact.mjs   # → artifact/poetic-cutout-layout.html
   但水彩畫的暈染邊界本來就是靠模糊整張 RGBA（連 alpha 一起模糊）做出來的，
   裁回銳利邊界會把暈開的那圈整圈裁掉，暈染效果就消失了。所以 `makeWatercolor()`
   自己就是最終圖，不再經過 `bakeTexturedSilhouette()`。
+- **`onnxruntime-web` 的版本在 `npm ci` 底下會炸**。`@imgly/background-removal` 的
+  README 要求裝 dev 預發布版 `1.21.0-dev.20250206-d981b153d3`，但它自己
+  `package.json` 裡宣告的 `peerDependencies` 卻是穩定版 `1.21.0`——這兩個版本號互相
+  矛盾。本機 `npm install` 不太在意這種衝突，`npm ci`（CI 用的）卻會直接判定
+  lockfile「不合法」而中止安裝。GitHub Actions 的 `deploy.yml` 因此要多加
+  `--legacy-peer-deps`。**改版號時要注意**：如果哪天把 `onnxruntime-web` 換成穩定版
+  `1.21.0`，記得回頭測一次自動摳圖還能不能正常跑（README 特別交代要用 dev 版，
+  應該是有原因的）。
 
 ---
 

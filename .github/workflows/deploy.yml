@@ -23,7 +23,11 @@ jobs:
         with:
           node-version: 22
           cache: npm
-      - run: npm ci
+      # --legacy-peer-deps：@imgly/background-removal 宣告的 peerDependency 是
+      # onnxruntime-web@1.21.0（穩定版），但它自己的 README 又要求裝 dev 預發布版
+      # 1.21.0-dev.20250206-d981b153d3 才能用；npm ci 預設會因為這個內部矛盾直接
+      # 判定 lockfile 「不合法」而中止，要放寬這個檢查才裝得起來。
+      - run: npm ci --legacy-peer-deps
       - run: npm run build
         env:
           VITE_BASE: /poetic-cutout-layout/
